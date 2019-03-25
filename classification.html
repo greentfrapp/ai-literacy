@@ -37,6 +37,16 @@
     svg circle:hover {
       cursor: pointer;
     }
+    h3#xaxis {
+      position: absolute;
+      top: 570px;
+      left: 495px;
+    }
+    h3#yaxis {
+      position: absolute;
+      top: 315px;
+      left: 225px;
+    }
     h1.title {
       color: #FFF;
       background-color: #C30;
@@ -50,7 +60,10 @@
       width: 200px;
       padding: 20px;
     }
-    div#menu button {
+    div#menu .buttons {
+      margin: 5px;
+    }
+    div#menu > button.button {
       margin: 5px;
     }
     img#network {
@@ -126,6 +139,8 @@
       <svg id="svg" :width="svgWidth" :height="svgHeight" @click="addPoint">
         <rect x=0 y=0 :width="svgWidth" :height="svgHeight" fill="#EEE"/>
       </svg>
+      <h3 id="xaxis">x<sub>1</sub></h3>
+      <h3 id="yaxis">x<sub>2</sub></h3>
       <img id="network" src="network.svg" width="700"/>
       <div id="weightsA" class="ui labeled big input">
         <div class="ui label">
@@ -166,12 +181,13 @@
       <button class="ui large button" :class="{ disabled: training }" @click="step()">Step</button>
       <button class="ui large button" @click="startStopTraining()">{{ command }}</button>
       <button class="ui large button" :class="{ disabled: training }" @click="train()">Run {{ iterations }} iterations</button>
-      <button class="ui large button" :class="{ disabled: training }" @click="init()">Refresh</button>
+      <button class="ui large icon button" :class="{ disabled: training }" @click="init()"><i class="redo icon"></i></button>
+      <div class="ui buttons">
+        <button class="ui red large button" :class="{ basic: activeClass !== 0 }" @click="switchClass(0)">0</button>
+        <button class="ui blue large button" :class="{ basic: activeClass !== 1 }" @click="switchClass(1)">1</button>
+      </div>
     </div>
-    <div class="ui buttons">
-      <button class="ui red large button" :class="{ basic: activeClass !== 0 }" @click="switchClass(0)">Red</button>
-      <button class="ui blue large button" :class="{ basic: activeClass !== 1 }" @click="switchClass(1)">Blue</button>
-    </div>
+    
   </div>
 
 <script>
@@ -207,7 +223,7 @@
         let grid = []
         for (let i=0;i<this.svgWidth/this.gridSize;i++) {
           for (let j=0;j<this.svgHeight/this.gridSize;j++) {
-            let sigmoid = this.sigmoid(this.weights.A * ((i + 0.5) * this.gridSize) / 500 + this.weights.B * ((j + 0.5) * this.gridSize) / 500 + this.weights.C)
+            let sigmoid = this.sigmoid(this.weights.A * ((i + 0.5) * this.gridSize) / 500 + this.weights.B * (this.svgHeight - ((j + 0.5) * this.gridSize)) / 500 + this.weights.C)
             prediction = Math.round(sigmoid)
             grid.push({
               x: i * this.gridSize,
@@ -273,8 +289,8 @@
           if (
             (clickX < (this.dataset[i].x1 * this.svgWidth + this.pointRadius)) &&
             (clickX > (this.dataset[i].x1 * this.svgWidth - this.pointRadius)) &&
-            (clickY < (this.dataset[i].x2 * this.svgHeight + this.pointRadius)) &&
-            (clickY > (this.dataset[i].x2 * this.svgHeight - this.pointRadius))) {
+            (clickY < (this.svgHeight - (this.dataset[i].x2 * this.svgHeight) + this.pointRadius)) &&
+            (clickY > (this.svgHeight - (this.dataset[i].x2 * this.svgHeight) - this.pointRadius))) {
               this.dataset.splice(i, 1)
               this.updateDisplayedPoints()
               return
@@ -283,7 +299,7 @@
         // Else add point
         this.dataset.push({
           x1: clickX / this.svgWidth,
-          x2: clickY / this.svgHeight,
+          x2: (this.svgHeight - clickY) / this.svgHeight,
           y: this.activeClass
         })
         this.updateDisplayedPoints()
@@ -297,12 +313,14 @@
           .data(this.dataset)
           .enter().append("circle")
           .attr("cx", row => Math.round(row.x1 * this.svgWidth))
-          .attr("cy", row => Math.round(row.x2 * this.svgHeight))
+          .attr("cy", row => Math.round(this.svgHeight - (row.x2 * this.svgHeight)))
           .attr("r", this.pointRadius)
           .attr("fill", row => this.colors[row.y])
           .style("stroke-width", 2)
           .style("stroke", "#FFFFFF")
           // .style("opacity", 0.5)
+
+        this.drawTicks()
       },
       updateGrid: function() {
         d3.select("svg")
@@ -399,6 +417,109 @@
       },
       format: function(x) {
         return numeral(x).format('0.000')
+      },
+      drawTicks: function() {
+        let paths = [
+          {}
+        ]
+        d3.select("svg")
+          .selectAll("path")
+          .data([]).exit().remove()
+        d3.select("svg")
+          .selectAll("path")
+          .data(this.classifierGrid)
+          .enter().append("rect")
+          .attr("x", row => row.x)
+          .attr("y", row => row.y)
+          .attr("width", this.gridSize)
+          .attr("height", this.gridSize)
+          // .style("stroke-width", 1)
+          // .style("stroke", "#FFFFFF")
+          .attr("fill", row => this.colors[row.label])
+          .style("opacity", row => row.strength)
+        this.updateDisplayedPoints()
+      },
+      drawTicks: function() {
+        let ticks = [
+          {
+            x1: 0, x2: 5,
+            y1: 500, y2: 495,
+            textx: 10, texty: 490,
+            text: 0
+          },
+          {
+            x1: 500, x2: 495,
+            y1: 500, y2: 495,
+            textx: 480, texty: 490,
+            text: 1
+          },
+          {
+            x1: 0, x2: 5,
+            y1: 0, y2: 5,
+            textx: 10, texty: 20,
+            text: 1
+          },
+          {
+            x1: 0, x2: 5,
+            y1: 250, y2: 250,
+            textx: 10, texty: 255,
+            text: 0.5
+          },
+          {
+            x1: 250, x2: 250,
+            y1: 500, y2: 495,
+            textx: 240, texty: 490,
+            text: 0.5
+          },
+          {
+            x1: 125, x2: 125,
+            y1: 500, y2: 495,
+            textx: 115, texty: 490,
+            text: 0.25
+          },
+          {
+            x1: 375, x2: 375,
+            y1: 500, y2: 495,
+            textx: 365, texty: 490,
+            text: 0.75
+          },
+          {
+            x1: 0, x2: 5,
+            y1: 125, y2: 125,
+            textx: 10, texty: 130,
+            text: 0.75
+          },
+          {
+            x1: 0, x2: 5,
+            y1: 375, y2: 375,
+            textx: 10, texty: 380,
+            text: 0.25
+          }
+        ]
+        d3.select("svg")
+          .selectAll("line.tick")
+          .data([]).exit().remove()
+        d3.select("svg")
+          .selectAll("line.tick")
+          .data(ticks)
+          .enter().append("line")
+          .attr("class", "tick")
+          .attr("x1", row => row.x1)
+          .attr("y1", row => row.y1)
+          .attr("x2", row => row.x2)
+          .attr("y2", row => row.y2)
+          .attr("stroke", "#AAA")
+          .attr("stroke-width", 2)
+        d3.select("svg")
+          .selectAll("text")
+          .data([]).exit().remove()
+        d3.select("svg")
+          .selectAll("text")
+          .data(ticks)
+          .enter().append("text")
+          .attr("x", row => row.textx)
+          .attr("y", row => row.texty)
+          .text(row => row.text)
       },
       test: function() {
         console.log("TEST")

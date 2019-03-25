@@ -14,7 +14,7 @@
   <style>
     body {
       /*background-color: #333;*/
-      margin: 20px 50px 0px 250px;
+      margin: 20px 0px 0px 300px;
       padding: 0px;
       overflow: hidden;
     }
@@ -26,12 +26,25 @@
       width: 100%;
       color: white;
     }
+    div#app {
+      margin-top: 50px;
+    }
     svg {
-      /*border: 1px red solid;*/
+      border: 1px #AAA solid;
       display: inline-block;
     }
     svg circle:hover {
       cursor: pointer;
+    }
+    h3#xaxis {
+      position: absolute;
+      top: 570px;
+      left: 546px;
+    }
+    h3#yaxis {
+      position: absolute;
+      top: 313px;
+      left: 285px;
     }
     table, tr, td, th {
       /*border: 1px black solid;*/
@@ -59,7 +72,7 @@
       position: absolute;
       left: 0px;
       top: 200px;
-      width: 200px;
+      width: 300px;
       padding: 20px;
     }
     div#menu button {
@@ -86,6 +99,8 @@
               stroke="#C30"
               stroke-width="5"/>
       </svg>
+      <h3 id="xaxis">x</h3>
+      <h3 id="yaxis">y</h3>
       <table class="ui celled table">
         <thead>
           <tr>
@@ -113,11 +128,10 @@
       <button class="ui large button" :class="{ disabled: training }" @click="step()">Step</button>
       <button class="ui large button" @click="startStopTraining()">{{ command }}</button>
       <button class="ui large button" :class="{ disabled: training }" @click="train()">Run {{ iterations }} iterations</button>
+      <button class="ui large icon button" :class="{ disabled: training }" @click="init()"><i class="redo icon"></i></button>
+      <h3>y = <span class="ui input"><input v-model="weights.A" style="width: 100px;"></span> x + <span class="ui input"><input v-model="weights.B" style="width: 100px;"></span></h3>
+      <h3>Error: {{ totalLoss.toLocaleString() }}</h3>
     </div>
-    <!-- <h1>y = Ax + B</h1> -->
-    <h3>y = <span class="ui input"><input v-model="weights.A" style="width: 100px;"></span> x + <span class="ui input"><input v-model="weights.B" style="width: 100px;"></span></h3>
-    <h2>{{ totalLoss.toLocaleString() }}</h2>
-    
   </div>
 
 <script>
@@ -206,6 +220,13 @@
       }
     },
     methods: {
+      init: function() {
+        if (!this.training) {
+          this.dataset = [{x:250, y:250}]
+          this.weights = {A: 0, B: 2.5}
+          this.updateDisplayedPoints()
+        }
+      },
       addDeletePoint: function(event) {
         if (!this.training) {
           let clickX = event.pageX - this.svgX,
@@ -246,6 +267,7 @@
           .attr("cy", row => row.y)
           .attr("r", this.pointRadius)
           .style("opacity", 0.5)
+        this.drawTicks()
       },
       step: function(running=false) {
         let A = this.weights.A,
@@ -309,6 +331,88 @@
       },
       format: function(x) {
         return numeral(x).format('0.000')
+      },
+      drawTicks: function() {
+        let ticks = [
+          {
+            x1: 0, x2: 5,
+            y1: 500, y2: 495,
+            textx: 10, texty: 490,
+            text: 0
+          },
+          {
+            x1: 500, x2: 495,
+            y1: 500, y2: 495,
+            textx: 480, texty: 490,
+            text: 1
+          },
+          {
+            x1: 0, x2: 5,
+            y1: 0, y2: 5,
+            textx: 10, texty: 20,
+            text: 1
+          },
+          {
+            x1: 0, x2: 5,
+            y1: 250, y2: 250,
+            textx: 10, texty: 255,
+            text: 0.5
+          },
+          {
+            x1: 250, x2: 250,
+            y1: 500, y2: 495,
+            textx: 240, texty: 490,
+            text: 0.5
+          },
+          {
+            x1: 125, x2: 125,
+            y1: 500, y2: 495,
+            textx: 115, texty: 490,
+            text: 0.25
+          },
+          {
+            x1: 375, x2: 375,
+            y1: 500, y2: 495,
+            textx: 365, texty: 490,
+            text: 0.75
+          },
+          {
+            x1: 0, x2: 5,
+            y1: 125, y2: 125,
+            textx: 10, texty: 130,
+            text: 0.75
+          },
+          {
+            x1: 0, x2: 5,
+            y1: 375, y2: 375,
+            textx: 10, texty: 380,
+            text: 0.25
+          }
+        ]
+        d3.select("svg")
+          .selectAll("line.tick")
+          .data([]).exit().remove()
+        d3.select("svg")
+          .selectAll("line.tick")
+          .data(ticks)
+          .enter().append("line")
+          .attr("class", "tick")
+          .attr("x1", row => row.x1)
+          .attr("y1", row => row.y1)
+          .attr("x2", row => row.x2)
+          .attr("y2", row => row.y2)
+          .attr("stroke", "#AAA")
+          .attr("stroke-width", 2)
+        d3.select("svg")
+          .selectAll("text")
+          .data([]).exit().remove()
+        d3.select("svg")
+          .selectAll("text")
+          .data(ticks)
+          .enter().append("text")
+          .attr("x", row => row.textx)
+          .attr("y", row => row.texty)
+          .text(row => row.text)
       }
     }
   })
