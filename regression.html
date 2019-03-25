@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Learning Regression</title>
+  <script
+        src="http://code.jquery.com/jquery-3.3.1.min.js"
+        integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
+        crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/vue"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/5.9.2/d3.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/numeral.js/2.0.6/numeral.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/semantic.min.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/semantic.min.css" rel="stylesheet">
+  <style>
+    body {
+      /*background-color: #333;*/
+      margin: 20px 50px 0px 250px;
+      padding: 0px;
+      overflow: hidden;
+    }
+    div#header {
+      background-color: #C30;
+      position: fixed;
+      top: 0px;
+      left: 0px;
+      width: 100%;
+      color: white;
+    }
+    svg {
+      /*border: 1px red solid;*/
+      display: inline-block;
+    }
+    svg circle:hover {
+      cursor: pointer;
+    }
+    table, tr, td, th {
+      /*border: 1px black solid;*/
+    }
+    table.ui.celled.table {
+      display: inline-block;
+      width: 435px;
+      max-height: 490px;
+      overflow: auto;
+      vertical-align: top;
+      margin-top: 0px;
+      table-layout: fixed;
+    }
+    .ui.table thead th {
+      text-align: center;
+      width: 70px;
+    }
+    h1.title {
+      color: #FFF;
+      background-color: #C30;
+      display: inline-block;
+    }
+    div#menu {
+      /*background-color: #C30;*/
+      position: absolute;
+      left: 0px;
+      top: 200px;
+      width: 200px;
+      padding: 20px;
+    }
+    div#menu button {
+      margin: 5px;
+    }
+    .ui.table tr.positive {
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <a href="./">
+    <div id="header">
+      <h1>Neural Network Demos</h1>
+    </div>
+  </a>
+  <div id="app">
+    <h1 class="title">Learning Regression</h1>
+    <div>
+      <svg id="svg" :width="svgWidth" :height="svgHeight" @click="addDeletePoint">
+        <rect x=0 y=0 :width="svgWidth" :height="svgHeight" fill="#EEE"/>
+        <line :x1="lineStart.x" :y1="lineStart.y"
+              :x2="lineEnd.x" :y2="lineEnd.y"
+              stroke="#C30"
+              stroke-width="5"/>
+      </svg>
+      <table class="ui celled table">
+        <thead>
+          <tr>
+            <th>x</th>
+            <th>y</th>
+            <th>Prediction</th>
+            <th>Error</th>
+            <th>A Update</th>
+            <th>B Update</th>
+          </tr>
+        </thead>
+        <tbody>
+        <tr v-for="(sample, i) in displayedData" :class="{ negative: i == stepCount % displayedData.length }">
+          <td>{{ format(sample.x) }}</td>
+          <td>{{ format(sample.y) }}</td>
+          <td>{{ format(sample.prediction) }}</td>
+          <td>{{ format(sample.error) }}</td>
+          <td>{{ format(sample.updateA) }}</td>
+          <td>{{ format(sample.updateB) }}</td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+    <div id="menu">
+      <button class="ui large button" :class="{ disabled: training }" @click="step()">Step</button>
+      <button class="ui large button" @click="startStopTraining()">{{ command }}</button>
+      <button class="ui large button" :class="{ disabled: training }" @click="train()">Run {{ iterations }} iterations</button>
+    </div>
+    <!-- <h1>y = Ax + B</h1> -->
+    <h3>y = <span class="ui input"><input v-model="weights.A" style="width: 100px;"></span> x + <span class="ui input"><input v-model="weights.B" style="width: 100px;"></span></h3>
+    <h2>{{ totalLoss.toLocaleString() }}</h2>
+    
+  </div>
+
+<script>
+  var app = new Vue({
+    el: "#app",
+    created: function() {
+      this.updateDisplayedPoints();
+    },
+    data: {
+      dataset: [{
+        x: 250,
+        y: 250
+      }],
+      pointRadius: 10,
+      weights: {
+        A: 0,
+        B: 2.5,
+      },
+      svgWidth: 500,
+      svgHeight: 500,
+      scale: 100,
+      lr: 1e-3,
+      iterations: 500000,
+      stepCount: 0,
+      displayedlr: 1,
+      training: false,
+    },
+    computed: {
+      lineStart: function() {
+        return {
+          x: -100,
+          y: this.svgHeight - (-100) * this.weights.A - this.weights.B * this.scale
+        }
+      },
+      lineEnd: function() {
+        return {
+          x: this.svgWidth + 100,
+          y: this.svgHeight - (this.svgWidth + 100) * this.weights.A - this.weights.B * this.scale
+        }
+      },
+      totalLoss: function() {
+        let loss = 0,
+        A = this.weights.A,
+        B = this.weights.B
+        for (let i=0;i<this.dataset.length;i++) {
+          x = this.dataset[i].x / this.scale
+          truth = (this.svgHeight - this.dataset[i].y) / this.scale
+          prediction = A * x + B
+          error = prediction - truth
+          loss += error ** 2
+        }
+        return loss
+      },
+      svgX: function() {
+        return document.getElementById("svg").getBoundingClientRect().x
+      },
+      svgY: function() {
+        return document.getElementById("svg").getBoundingClientRect().y
+      },
+      displayedData: function() {
+        let displayedData = []
+        for (let i=0;i<this.dataset.length;i++) {
+          let x = this.dataset[i].x / this.svgWidth,
+          y = (this.svgHeight - this.dataset[i].y) / this.svgHeight,
+          prediction = this.predict(x),
+          error = prediction - y,
+          updateA = - x * this.displayedlr * error,
+          updateB = - this.displayedlr * error / this.scale * this.svgHeight
+          displayedData.push({
+            x: x,
+            y: y,
+            prediction: prediction,
+            error: error,
+            updateA: updateA,
+            updateB: updateB,
+          })
+        }
+        return displayedData
+      },
+      command: function() {
+        if (this.training) {
+          return "Stop Training"
+        } else {
+          return "Start Training"
+        }
+      }
+    },
+    methods: {
+      addDeletePoint: function(event) {
+        if (!this.training) {
+          let clickX = event.pageX - this.svgX,
+            clickY = event.pageY - this.svgY
+          // If you are clicking ON a circle: Delete circle
+          for (let i=0;i<this.dataset.length;i++) {
+            if (
+              (clickX < (this.dataset[i].x + this.pointRadius)) &&
+              (clickX > (this.dataset[i].x - this.pointRadius)) &&
+              (clickY < (this.dataset[i].y + this.pointRadius)) &&
+              (clickY > (this.dataset[i].y - this.pointRadius))) {
+                if (this.dataset.length > 1) {
+                  this.dataset.splice(i, 1)
+                  this.updateDisplayedPoints()
+                }
+                return
+            }
+          }
+          // Else add point
+          if (this.dataset.length < 10) {
+            this.dataset.push({
+              x: clickX,
+              y: clickY,
+            })
+            this.updateDisplayedPoints()
+          }
+        }
+      },
+      updateDisplayedPoints: function() {
+        d3.select("svg")
+          .selectAll("circle")
+          .data([]).exit().remove()
+        d3.select("svg")
+          .selectAll("circle")
+          .data(this.dataset)
+          .enter().append("circle")
+          .attr("cx", row => row.x)
+          .attr("cy", row => row.y)
+          .attr("r", this.pointRadius)
+          .style("opacity", 0.5)
+      },
+      step: function(running=false) {
+        let A = this.weights.A,
+        B = this.weights.B * this.scale / this.svgHeight,
+        x = this.dataset[this.stepCount % this.dataset.length].x / this.svgWidth,
+        truth = (this.svgHeight - this.dataset[this.stepCount % this.dataset.length].y) / this.svgHeight,
+        prediction = A * x + B,
+        error = prediction - truth
+        if (!running) {
+          A -= x * this.displayedlr * error
+          B -= this.displayedlr * error
+          this.stepCount++
+        } else {
+          A -= x * (0.1 * 0.999 ** this.stepCount) * error
+          B -= (0.1 * 0.999 ** this.stepCount) * error
+          this.stepCount++
+        }
+        // this.weights.A = A
+        // this.weights.B = B * this.svgHeight / this.scale
+        this.weights.A = Math.round(1000 * A) / 1000
+        this.weights.B = Math.round(1000 * B * this.svgHeight / this.scale) / 1000
+        // if (this.stepCount > 300) {
+        //   clearTimeout(this.cancel)
+        // }
+      },
+      train: function() {
+        let i = 0,
+        A = this.weights.A,
+        B = this.weights.B * this.scale / this.svgHeight
+        while (true) {
+          x = this.dataset[i % this.dataset.length].x / this.svgWidth
+          truth = (this.svgHeight - this.dataset[i % this.dataset.length].y) / this.svgHeight
+          prediction = A * x + B
+          error = prediction - truth
+          A -= x * this.lr * error
+          B -= this.lr * error
+          i++
+          if (i == this.iterations) {
+            break
+          }
+        }
+        this.weights.A = Math.round(1000 * A) / 1000
+        this.weights.B = Math.round(1000 * B * this.svgHeight / this.scale) / 1000
+      },
+      startStopTraining: function() {
+        if (!this.training) {
+          this.training = true
+          this.stepCount = 0
+          var self = this
+          this.cancel = setInterval(function(){self.step(running=true)}, 1)
+        } else {
+          this.training = false
+          clearTimeout(this.cancel)
+        }
+        
+      },
+      predict: function(x) {
+        let A = this.weights.A,
+        B = this.weights.B * this.scale / this.svgHeight
+        return A * x + B
+      },
+      format: function(x) {
+        return numeral(x).format('0.000')
+      }
+    }
+  })
+</script>
+</body>
+</html>

@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Learning Classification</title>
+  <script
+        src="http://code.jquery.com/jquery-3.3.1.min.js"
+        integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
+        crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/vue"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/5.9.2/d3.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/numeral.js/2.0.6/numeral.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/semantic.min.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/semantic.min.css" rel="stylesheet">
+  <style>
+    body {
+      /*background-color: #333;*/
+      margin: 20px 50px 0px 250px;
+      padding: 0px;
+      overflow: hidden;
+    }
+    div#header {
+      background-color: #C30;
+      position: fixed;
+      top: 0px;
+      left: 0px;
+      width: 100%;
+      color: white;
+    }
+    div#app {
+      margin-top: 50px;
+    }
+    svg {
+      border: 1px #AAA solid;
+      display: inline-block;
+      z-index: 1000;
+    }
+    svg circle:hover {
+      cursor: pointer;
+    }
+    h1.title {
+      color: #FFF;
+      background-color: #C30;
+      display: inline-block;
+    }
+    div#menu {
+      /*background-color: #C30;*/
+      position: absolute;
+      left: 0px;
+      top: 200px;
+      width: 200px;
+      padding: 20px;
+    }
+    div#menu button {
+      margin: 5px;
+    }
+    img#network {
+      position: absolute;
+      top: -200px;
+      left: 600px;
+      z-index: -100;
+    }
+    div#weightsA {
+      position: absolute;
+      left: 860px;
+      top: 170px;
+      width: 80px;
+      z-index: 100;
+    }
+    div#weightsA input {
+      background-color: white;
+      padding: 10px;
+    }
+    div#weightsB {
+      position: absolute;
+      left: 860px;
+      top: 250px;
+      width: 80px;
+      z-index: 100;
+    }
+    div#weightsB input {
+      background-color: white;
+      padding: 10px;
+    }
+    div#weightsC {
+      position: absolute;
+      left: 900px;
+      top: 330px;
+      width: 80px;
+      z-index: 100;
+    }
+    div#weightsC input {
+      background-color: white;
+      padding: 10px;
+    }
+    h1#equation {
+      position: absolute;
+      left: 800px;
+      top: 390px;
+    }
+    table.ui.celled.table {
+      position: absolute;
+      width: 300px;
+      top: 460px;
+      left: 780px;
+      table-layout: fixed;
+    }
+    .ui.table thead th {
+      text-align: center;
+      width: 100px;
+    }
+    .ui.table tbody td {
+      text-align: center;
+      width: 100px;
+    }
+  </style>
+</head>
+<body>
+  <a href="./">
+    <div id="header">
+      <h1>Neural Network Demos</h1>
+    </div>
+  </a>
+  <div id="app">
+    <h1 class="title">Learning Classification</h1>
+    <div>
+      <svg id="svg" :width="svgWidth" :height="svgHeight" @click="addPoint">
+        <rect x=0 y=0 :width="svgWidth" :height="svgHeight" fill="#EEE"/>
+      </svg>
+      <img id="network" src="network.svg" width="700"/>
+      <div id="weightsA" class="ui labeled big input">
+        <div class="ui label">
+          A
+        </div>
+        <input v-model="weights.A">
+      </div>
+      <div id="weightsB" class="ui labeled big input">
+        <div class="ui label">
+          B
+        </div>
+        <input v-model="weights.B">
+      </div>
+      <div id="weightsC" class="ui labeled big input">
+        <div class="ui label">
+          C
+        </div>
+        <input v-model="weights.C">
+      </div>
+      <h1 id="equation">y = σ(Ax<sub>1</sub> + Bx<sub>2</sub> + C)</h1>
+      <table class="ui celled table">
+        <thead>
+          <tr>
+            <th>Update A</th>
+            <th>Update B</th>
+            <th>Update C</th>
+          </tr>
+        </thead>
+        <tbody>
+          <td>{{ format(updates.A) }}</td>
+          <td>{{ format(updates.B) }}</td>
+          <td>{{ format(updates.C) }}</td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+    <div id="menu">
+      <button class="ui large button" :class="{ disabled: training }" @click="step()">Step</button>
+      <button class="ui large button" @click="startStopTraining()">{{ command }}</button>
+      <button class="ui large button" :class="{ disabled: training }" @click="train()">Run {{ iterations }} iterations</button>
+      <button class="ui large button" :class="{ disabled: training }" @click="init()">Refresh</button>
+    </div>
+    <div class="ui buttons">
+      <button class="ui red large button" :class="{ basic: activeClass !== 0 }" @click="switchClass(0)">Red</button>
+      <button class="ui blue large button" :class="{ basic: activeClass !== 1 }" @click="switchClass(1)">Blue</button>
+    </div>
+  </div>
+
+<script>
+  var app = new Vue({
+    el: "#app",
+    created: function() {
+      this.updateGrid();
+    },
+    data: {
+      dataset: [{x1:0.5,x2:0.5,y:0}],
+      pointRadius: 10,
+      weights: {
+        A: 0,
+        B: 0,
+        C: 0
+      },
+      activeClass: 0,
+      colors: [
+        "#e74c3c",
+        "#3498db",
+      ],
+      svgWidth: 500,
+      svgHeight: 500,
+      gridSize: 10,
+      lr: 1e-3,
+      iterations: 500000,
+      stepCount: 0,
+      displayedlr: 0.3,
+      training: false,
+    },
+    computed: {
+      classifierGrid: function() {
+        let grid = []
+        for (let i=0;i<this.svgWidth/this.gridSize;i++) {
+          for (let j=0;j<this.svgHeight/this.gridSize;j++) {
+            let sigmoid = this.sigmoid(this.weights.A * ((i + 0.5) * this.gridSize) / 500 + this.weights.B * ((j + 0.5) * this.gridSize) / 500 + this.weights.C)
+            prediction = Math.round(sigmoid)
+            grid.push({
+              x: i * this.gridSize,
+              y: j * this.gridSize,
+              label: prediction,
+              strength: Math.abs(sigmoid - 0.5)
+            })
+          }
+        }
+        return grid
+      },
+      svgX: function() {
+        return document.getElementById("svg").getBoundingClientRect().x
+      },
+      svgY: function() {
+        return document.getElementById("svg").getBoundingClientRect().y
+      },
+      command: function() {
+        if (this.training) {
+          return "Stop Training"
+        } else {
+          return "Start Training"
+        }
+      },
+      updates: function() {
+        let A = this.weights.A,
+        B = this.weights.B,
+        C = this.weights.C,
+        x1 = this.dataset[this.stepCount % this.dataset.length].x1,
+        x2 = this.dataset[this.stepCount % this.dataset.length].x2,
+        truth = this.dataset[this.stepCount % this.dataset.length].y,
+        prediction = this.sigmoid(A * x1 + B * x2 + C),
+        error = prediction - truth
+        let lr = this.displayedlr
+        let updateA = -x1 * lr * prediction * (1 - prediction) * error
+        let updateB = -x2 * lr * prediction * (1 - prediction) * error
+        let updateC = -lr * prediction * (1 - prediction) * error
+        return {
+          A: updateA,
+          B: updateB,
+          C: updateC
+        }
+      }
+    },
+    methods: {
+      init: function() {
+        if (!this.training) {
+          this.dataset = [{x1:0.5,x2:0.5,y:0}]
+          this.weights = {
+            A: 0,
+            B: 0,
+            C: 0
+          }
+          this.updateDisplayedPoints()
+          this.updateGrid()
+        }
+      },
+      addPoint: function(event) {
+        let clickX = event.pageX - this.svgX,
+          clickY = event.pageY - this.svgY
+        // If you are clicking ON a circle: Delete circle
+        for (let i=0;i<this.dataset.length;i++) {
+          if (
+            (clickX < (this.dataset[i].x1 * this.svgWidth + this.pointRadius)) &&
+            (clickX > (this.dataset[i].x1 * this.svgWidth - this.pointRadius)) &&
+            (clickY < (this.dataset[i].x2 * this.svgHeight + this.pointRadius)) &&
+            (clickY > (this.dataset[i].x2 * this.svgHeight - this.pointRadius))) {
+              this.dataset.splice(i, 1)
+              this.updateDisplayedPoints()
+              return
+          }
+        }
+        // Else add point
+        this.dataset.push({
+          x1: clickX / this.svgWidth,
+          x2: clickY / this.svgHeight,
+          y: this.activeClass
+        })
+        this.updateDisplayedPoints()
+      },
+      updateDisplayedPoints: function() {
+        d3.select("svg")
+          .selectAll("circle")
+          .data([]).exit().remove()
+        d3.select("svg")
+          .selectAll("circle")
+          .data(this.dataset)
+          .enter().append("circle")
+          .attr("cx", row => Math.round(row.x1 * this.svgWidth))
+          .attr("cy", row => Math.round(row.x2 * this.svgHeight))
+          .attr("r", this.pointRadius)
+          .attr("fill", row => this.colors[row.y])
+          .style("stroke-width", 2)
+          .style("stroke", "#FFFFFF")
+          // .style("opacity", 0.5)
+      },
+      updateGrid: function() {
+        d3.select("svg")
+          .selectAll("rect")
+          .data([]).exit().remove()
+        d3.select("svg")
+          .selectAll("rect")
+          .data(this.classifierGrid)
+          .enter().append("rect")
+          .attr("x", row => row.x)
+          .attr("y", row => row.y)
+          .attr("width", this.gridSize)
+          .attr("height", this.gridSize)
+          // .style("stroke-width", 1)
+          // .style("stroke", "#FFFFFF")
+          .attr("fill", row => this.colors[row.label])
+          .style("opacity", row => row.strength)
+        this.updateDisplayedPoints()
+      },
+      sigmoid: function(x) {
+        return 1 / (1 + Math.exp(-x))
+      },
+      train: function() {
+        let i = 0,
+        A = this.weights.A,
+        B = this.weights.B,
+        C = this.weights.C
+        while (true) {
+          let x1 = this.dataset[i % this.dataset.length].x1
+          let x2 = this.dataset[i % this.dataset.length].x2
+          let truth = this.dataset[i % this.dataset.length].y
+          let prediction = this.sigmoid(A * x1 + B * x2 + C)
+          let error = prediction - truth
+          A -= x1 * this.lr * prediction * (1 - prediction) * error
+          B -= x2 * this.lr * prediction * (1 - prediction) * error
+          C -= this.lr * prediction * (1 - prediction) * error
+          i++
+          if (i == this.iterations) {
+            break
+          }
+        }
+        this.weights.A = Math.round(1000 * A) / 1000
+        this.weights.B = Math.round(1000 * B) / 1000
+        this.weights.C = Math.round(1000 * C) / 1000
+        this.updateGrid()
+      },
+      step: function(running=false) {
+        let A = this.weights.A,
+        B = this.weights.B,
+        C = this.weights.C,
+        x1 = this.dataset[this.stepCount % this.dataset.length].x1,
+        x2 = this.dataset[this.stepCount % this.dataset.length].x2,
+        truth = this.dataset[this.stepCount % this.dataset.length].y,
+        prediction = this.sigmoid(A * x1 + B * x2 + C),
+        error = prediction - truth
+        let lr = this.displayedlr
+        // if (running) {
+        //   lr = 0.999 ** this.stepCount
+        // }
+        A -= x1 * lr * prediction * (1 - prediction) * error
+        B -= x2 * lr * prediction * (1 - prediction) * error
+        C -= lr * prediction * (1 - prediction) * error
+        this.stepCount++
+        this.weights.A = Math.round(1000 * A) / 1000
+        this.weights.B = Math.round(1000 * B) / 1000
+        this.weights.C = Math.round(1000 * C) / 1000
+        if (running) {
+          if (this.stepCount % 2 == 0) {
+            this.updateGrid()
+          }
+        } else {
+          this.updateGrid()
+        }
+      },
+      switchClass: function(newClass) {
+        this.activeClass = newClass
+      },
+      startStopTraining: function() {
+        if (!this.training) {
+          this.training = true
+          // this.weights = {
+          //   A: 0,
+          //   B: 0,
+          //   C: 0
+          // }
+          this.stepCount = 0
+          var self = this
+          this.cancel = setInterval(function(){self.step(running=true)}, 1)
+        } else {
+          this.training = false
+          clearTimeout(this.cancel)
+        }
+        
+      },
+      format: function(x) {
+        return numeral(x).format('0.000')
+      },
+      test: function() {
+        console.log("TEST")
+      }
+    }
+  })
+</script>
+</body>
+</html>
