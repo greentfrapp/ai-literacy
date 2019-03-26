@@ -317,7 +317,7 @@
           .attr("r", this.pointRadius)
           .attr("fill", row => this.colors[row.y])
           .style("stroke-width", 2)
-          .style("stroke", "#FFFFFF")
+          .style("stroke", (row, i) => {if (this.stepCount % this.dataset.length == i) {return "#000000"} else {return "#FFFFFF"}})
           // .style("opacity", 0.5)
 
         this.drawTicks()
