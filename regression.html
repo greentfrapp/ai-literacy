@@ -130,7 +130,7 @@
       <button class="ui large button" :class="{ disabled: training }" @click="train()">Run {{ iterations }} steps</button>
       <button class="ui large icon button" :class="{ disabled: training }" @click="init()"><i class="redo icon"></i></button>
       <h3>y = <span class="ui input"><input v-model="weights.A" style="width: 100px;"></span> x + <span class="ui input"><input v-model="weights.B" style="width: 100px;"></span></h3>
-      <h3>Error: {{ totalLoss.toLocaleString() }}</h3>
+      <h3>Sum of Squared Errors: {{ totalLoss.toLocaleString() }}</h3>
     </div>
   </div>
 
@@ -148,11 +148,11 @@
       pointRadius: 10,
       weights: {
         A: 0,
-        B: 2.5,
+        B: 0.5,
       },
       svgWidth: 500,
       svgHeight: 500,
-      scale: 100,
+      scale: 500,
       lr: 1e-3,
       iterations: 500000,
       stepCount: 0,
