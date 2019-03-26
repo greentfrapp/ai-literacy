@@ -180,7 +180,7 @@
     <div id="menu">
       <button class="ui large button" :class="{ disabled: training }" @click="step()">Step</button>
       <button class="ui large button" @click="startStopTraining()">{{ command }}</button>
-      <button class="ui large button" :class="{ disabled: training }" @click="train()">Run {{ iterations }} iterations</button>
+      <button class="ui large button" :class="{ disabled: training }" @click="train()">Run {{ iterations }} steps</button>
       <button class="ui large icon button" :class="{ disabled: training }" @click="init()"><i class="redo icon"></i></button>
       <div class="ui buttons">
         <button class="ui red large button" :class="{ basic: activeClass !== 0 }" @click="switchClass(0)">0</button>

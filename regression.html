@@ -127,7 +127,7 @@
     <div id="menu">
       <button class="ui large button" :class="{ disabled: training }" @click="step()">Step</button>
       <button class="ui large button" @click="startStopTraining()">{{ command }}</button>
-      <button class="ui large button" :class="{ disabled: training }" @click="train()">Run {{ iterations }} iterations</button>
+      <button class="ui large button" :class="{ disabled: training }" @click="train()">Run {{ iterations }} steps</button>
       <button class="ui large icon button" :class="{ disabled: training }" @click="init()"><i class="redo icon"></i></button>
       <h3>y = <span class="ui input"><input v-model="weights.A" style="width: 100px;"></span> x + <span class="ui input"><input v-model="weights.B" style="width: 100px;"></span></h3>
       <h3>Error: {{ totalLoss.toLocaleString() }}</h3>
